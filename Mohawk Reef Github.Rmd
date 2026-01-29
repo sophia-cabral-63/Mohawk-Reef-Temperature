@@ -1,0 +1,215 @@
+---
+title: "Mohawk Reef Temperature Visualization"
+author: "Sophia Cabral"
+date: "2026-01-29"
+output: 
+    prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Reading in packages 
+
+library(ggplot2)
+library(gridExtra)
+library(dplyr)
+library(heatwaveR)
+library(RColorBrewer)
+library(ggrepel)
+library(ggspatial)
+
+#Read in .csv file
+
+temperature <- read.csv("temperature.csv")
+
+```
+
+```{r Mohawk simple temperature visualization, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Filter for Mohawk site (site code = MOHK)
+temperature_avg_MK <- temperature %>%
+  filter(SITE %in% c("MOHK")) %>%
+  mutate(DATE_LOCAL = as.Date(DATE_LOCAL)) %>%
+  group_by(SITE, DATE_LOCAL) %>%   
+  summarise(mean_temp = mean(TEMP_C, na.rm = TRUE))
+
+MK_temperature_updated <- ggplot(temperature_avg_MK, aes(x = DATE_LOCAL, y = mean_temp, color = SITE, fill = SITE)) +
+  geom_line(linewidth = 1) + 
+  labs(y = "Daily Average Temperature (°C)", x = "Date", fill = "Site") +
+  scale_fill_manual(values = c("#601f9e"),
+                    name = "Site",
+                    labels = c("Mohawk Reef")) +
+  scale_color_manual(values = c("#601f9e"),
+                     labels = c("Mohawk Reef")) +
+ scale_x_date(
+  labels = function(x) format(x, "'%y"),
+  #limits = c(as.Date("2024-01-01"), NA),
+  breaks = seq(min(temperature_avg_MK$DATE_LOCAL), max(temperature_avg_MK$DATE_LOCAL), by = "1 year")
+) + 
+  theme(
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white"),
+    panel.grid.major = element_line(color = "gray", linewidth = 0.5),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 14, margin = margin(b = 20)),
+    axis.line = element_line(color = "black", linewidth = 0.5), 
+    axis.text.x = element_text(angle = 35, hjust = 1)
+  )
+
+print(MK_temperature_updated)
+
+#ggsave("Mohawk updated temperature.png", MK_temperature_updated, width = 10, height = 6)
+
+```
+
+```{r Mohawk data using heatwave R, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+temperature_R_MOHK <- temperature %>%
+  filter(SITE %in% c("MOHK")) %>%
+  mutate(DATE_LOCAL = as.Date(DATE_LOCAL)) %>%
+  group_by(SITE, DATE_LOCAL) %>%
+  summarise(temp = mean(TEMP_C, na.rm = TRUE), .groups = "drop") %>%
+  rename(t = DATE_LOCAL)
+
+ts <- ts2clm(temperature_R_MOHK, climatologyPeriod = c("2003-03-06", "2025-06-18"))
+mhw <- detect_event(ts)
+
+mhw$event %>% 
+  dplyr::ungroup() %>%
+  dplyr::select(event_no, duration, date_start, date_peak, intensity_max, intensity_cumulative) %>% 
+  dplyr::arrange(-intensity_max) %>% 
+  head(5)
+
+#Looking at the Blob
+heatwaveRMOHK <- event_line(mhw, spread = 150, start_date = "2003-03-06", end_date = "2025-06-18", metric = intensity_max)
+
+
+heatwaveRMOHK <- event_line(
+  mhw,
+  spread = 150,
+  start_date = as.Date("2003-03-06"),
+  end_date   = as.Date("2025-06-18"),
+  metric = intensity_max
+)
+
+print(heatwaveRMOHK)
+
+
+#Counting the different MHWs and their severity
+ts <- ts2clm(temperature_R_MOHK, climatologyPeriod = c("2003-03-06", "2025-06-18"))
+mhw <- detect_event(ts)
+res_MOHK <- detect_event(ts2clm(temperature_R_MOHK, climatologyPeriod = c("2003-03-06", "2025-06-18")))
+res_MOHK_cat <- category(res_MOHK, S = FALSE, name = "MOHK")
+tail(res_MOHK_cat)
+
+
+
+clim_all <- mhw$clim %>%
+  dplyr::mutate(
+    diff       = thresh - seas,
+    thresh_2x  = thresh + diff,
+    thresh_3x  = thresh_2x + diff,
+    thresh_4x  = thresh_3x + diff
+  )
+
+#Creating the colors 
+
+lineColCat <- c(
+  "Temperature"  = "black",
+  "Climatology"  = "blue",
+  "Threshold"    = "red",
+  "2x Threshold" = "darkred",
+  "3x Threshold" = "firebrick",
+  "4x Threshold" = "brown"
+)
+
+fillColCat <- c(
+  "Moderate" = "#ffc866",
+  "Strong"   = "#ff6900",
+  "Severe"   = "#9e0000",
+  "Extreme"  = "#2d0000"
+)
+
+# Plot record with MHW events shaded (only plotted Moderate MHWs here)
+MKthreshold <- ggplot(clim_all, aes(x = t, y = temp)) +
+  # Flames (events)
+  geom_flame(aes(y2 = thresh,   fill = "Moderate")) +
+  geom_flame(aes(y2 = thresh_2x, fill = "Strong")) +
+  #geom_flame(aes(y2 = thresh_3x, fill = "Severe")) +
+  #geom_flame(aes(y2 = thresh_4x, fill = "Extreme")) +
+  # Thresholds & climatology
+  geom_line(aes(y = seas,   colour = "Climatology"), size = 0.6) +
+  geom_line(aes(y = thresh, colour = "Threshold"),   size = 0.6, linetype = "dashed") +
+  #geom_line(aes(y = thresh_2x, colour = "2x Threshold"), size = 0.6, linetype = "dashed") +
+  #geom_line(aes(y = thresh_3x, colour = "3x Threshold"), size = 0.6, linetype = "dotdash") +
+  #geom_line(aes(y = thresh_4x, colour = "4x Threshold"), size = 0.6, linetype = "dotted") +
+  # Actual temperature
+  geom_line(aes(y = temp, colour = "Temperature"), size = 0.3) +
+  # Custom colours
+  scale_colour_manual(name = NULL, values = lineColCat) +
+  scale_fill_manual(name = NULL, values = fillColCat, guide = "none") +
+  scale_x_date(
+    date_labels = "%Y",
+    date_breaks = "1 year",
+    limits = c(as.Date("2013-01-01"), NA)
+  ) +
+  labs(
+    y = "Temperature (°C)",
+    x = "Date",
+    title = "Marine Heatwave Events (2013–2025)"
+  ) +
+  theme_minimal() 
+
+MKthreshold
+
+#ggsave("Mohawk Reef MHW threshold.jpg",  MKthreshold, width = 20, height = 6)
+```
+
+```{r Mohawk warming stripes, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#filtering for Mohawk Reef 
+temperature_avg <- temperature %>%
+  filter(SITE %in% c("MOHK")) %>%
+  mutate(DATE_LOCAL = as.Date(DATE_LOCAL)) %>%
+  group_by(SITE, DATE_LOCAL) %>%   
+  summarise(mean_temp = mean(TEMP_C, na.rm = TRUE))
+
+#mean yearly temperature
+yearly_temp <- temperature_avg %>%
+  mutate(
+    DATE_LOCAL = as.Date(DATE_LOCAL),
+    year = format(DATE_LOCAL, "%Y")
+  ) %>%
+  group_by(SITE, year) %>%
+  summarise(
+    mean_annual_temp = mean(mean_temp, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+yearly_temp$year <- as.numeric(yearly_temp$year)
+
+#plotting warming stripes
+yearly_temp_graph <- ggplot(data=yearly_temp, mapping=aes(x=year, y=1, fill=mean_annual_temp)) +
+    geom_col(width=1) +
+    scale_x_continuous(
+  breaks = seq(min(yearly_temp$year),
+               max(yearly_temp$year),
+               by = 5),
+  expand = c(0, 0)
+) +
+    scale_y_continuous(expand=c(0, 0)) +
+    scale_fill_gradientn(colors=rev(brewer.pal(11, name="RdBu")), na.value="gray") +
+    labs(x=NULL, y=NULL, title="Annual mean temperatures", fill="T (°C)") +
+    theme(axis.text.y=element_blank(), panel.grid=element_blank(), panel.border = element_rect(color = "black", fill = NA, size = 1),  plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),)
+
+print(yearly_temp_graph)
+
+#ggsave("Mohawk temperature stripes.png", yearly_temp_graph, width = 6, height = 6)
+
+```
