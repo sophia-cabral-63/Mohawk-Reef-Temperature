@@ -4,8 +4,7 @@
 Image credits: Sophia Cabral
 
 # Mohawk Reef Temperature
-Visualization of Mohawk Reef (SBC LTER study site) bottom seawater temperature over time
-
+Visualization of Mohawk Reef (SBC LTER study site) bottom seawater temperature over time (basic visualization, heatwaveR, warming stripes, and temperature animation of coastline)
 ## Creator
 Sophia is a research technician at UC Santa Barbara, utilizing the NCEAS coreR Course catalog to format the repository. 
 
