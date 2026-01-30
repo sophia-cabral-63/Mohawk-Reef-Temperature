@@ -16,3 +16,7 @@ Sophia is a research technician at UC Santa Barbara, utilizing the NCEAS coreR C
 [2000 - 2025 bottom seawater temperature](https://doi.org/10.6073/pasta/c2c3f2e27aac1cae2a213ebbfdb85e25) 
 
 Reed, D. and R. Miller. 2025. SBC LTER: Reef: Bottom Temperature: Continuous water temperature, ongoing since 2000 ver 32. Environmental Data Initiative. https://doi.org/10.6073/pasta/c2c3f2e27aac1cae2a213ebbfdb85e25 (Accessed 2026-01-29).
+
+[Seawater Surface Temperature](https://doi.org/10.6073/pasta/e930954949b2635928b8be6824630f84)
+
+Kui, L. 2024. Daily sea surface temperature in Santa Barbara channel between 1982 and 2023 ver 3. Environmental Data Initiative. https://doi.org/10.6073/pasta/e930954949b2635928b8be6824630f84. Accessed 2026-01-29.
