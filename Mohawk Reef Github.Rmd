@@ -334,3 +334,111 @@ animation <- image_read(frames) |>
 
 image_write(animation, "temperature_animation.mp4")
 ```
+
+```{r SST map animation, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(sf)
+library(rnaturalearth)
+library(cmocean)
+
+SST <- read.csv("SST_temp.csv")
+
+
+SST <- SST %>%
+  mutate(
+    date = as.Date(date),
+    year = year(date)
+  )
+
+SST_yearly <- SST %>%
+  group_by(year, latitude, longitude, site) %>%
+  summarise(
+    temp = mean(temp, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+land <- ne_countries(scale = "medium", returnclass = "sf")
+dir.create("frames", showWarnings = FALSE)
+
+
+years <- sort(unique(SST_yearly$year))
+
+bbox <- SST_yearly %>%
+  summarise(
+    xmin = min(longitude, na.rm = TRUE),
+    xmax = max(longitude, na.rm = TRUE),
+    ymin = min(latitude, na.rm = TRUE),
+    ymax = max(latitude, na.rm = TRUE)
+  )
+
+for (y in years) {
+
+  p <- ggplot(
+    filter(SST_yearly, year == y),
+    aes(x = longitude, y = latitude, fill = temp)
+  ) +
+    #geom_tile() +
+    geom_raster(interpolate = TRUE) +
+    geom_sf(
+      data = land,
+      fill = "grey80",
+      color = "black",
+      inherit.aes = FALSE
+    ) +
+   coord_sf(
+  xlim = c(bbox$xmin, bbox$xmax),
+  ylim = c(bbox$ymin, bbox$ymax),
+  expand = FALSE
+) +
+    scale_fill_cmocean(
+      name = "thermal",
+      limits = range(SST_yearly$temp, na.rm = TRUE)
+    ) +
+    labs(
+      title = paste("Sea surface temperature —", y),
+      x = "Longitude",
+      y = "Latitude"
+    ) +
+     annotation_scale(location = "bl", width_hint = 0.3) +
+    annotation_north_arrow(location = "bl", which_north = "true", 
+        pad_x = unit(0.50, "in"), pad_y = unit(0.25, "in"),
+        style = north_arrow_fancy_orienteering) +
+    theme(
+  panel.grid = element_blank(),
+  axis.text = element_text(size = 10),
+  axis.title = element_text(size = 11),
+  plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+  legend.position = "right",
+   panel.background = element_rect(fill = "#f5fdff", color = NA),
+  plot.background  = element_rect(fill = "white", color = NA),
+  panel.grid.minor = element_line(color = "black", linetype = "dashed", 
+        size = 0.5),
+   panel.border = element_rect(color = "black", fill = NA, size = 1))
+
+  ggsave(
+    filename = sprintf("frames/sst_%04d.png", y),
+    plot = p,
+    width = 9,
+    height = 7,
+    dpi = 150
+  )
+}
+
+
+frames <- list.files(
+  "frames",
+  pattern = "sst_.*png",
+  full.names = TRUE
+)
+
+animation <- image_read(frames) |>
+  image_animate(fps = 4)
+
+image_write(animation, "sst_animation.mp4")
+
+```
